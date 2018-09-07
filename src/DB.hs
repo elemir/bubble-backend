@@ -14,6 +14,7 @@ module DB where
 import Data.Maybe
 import GHC.Generics
 
+import Control.Monad
 import Control.Monad.Logger
 
 import Data.Aeson
@@ -38,7 +39,7 @@ BubbleTask json
 
 data RBubbleTask = RBubbleTask
     { name :: String
-    , descr :: String
+    , descr :: Maybe String
     , cur :: Int
     , aim :: Int
     , subtasks :: [RBubbleTask]
@@ -48,7 +49,7 @@ instance ToJSON RBubbleTask
 
 rBubbleTask :: BubbleTask -> [RBubbleTask] -> RBubbleTask
 rBubbleTask (BubbleTask name descr cur aim _) xs = 
-    RBubbleTask name (fromMaybe "" descr) cur aim xs
+    RBubbleTask name descr cur aim xs
 
 toRBubbleTask :: [Entity BubbleTask] -> Maybe RBubbleTask
 toRBubbleTask (Entity id task:xs) = 
@@ -67,6 +68,9 @@ toRBubbleTask [] = Nothing
 
 getRBubbleTask :: Key BubbleTask -> SpockActionCtx ctx SqlBackend sess st (Maybe RBubbleTask)
 getRBubbleTask id = fmap toRBubbleTask $ runQuery' $ rawSql "WITH RECURSIVE rtasks(x) AS (SELECT ? UNION ALL SELECT bubble_task.id FROM rtasks, bubble_task WHERE bubble_task.parent = rtasks.x ORDER BY 1 DESC) SELECT ?? FROM bubble_task, rtasks WHERE id = rtasks.x" [PersistInt64 $ fromSqlKey id]
+
+removeRBubbleTask :: Key BubbleTask -> SpockActionCtx ctx SqlBackend sess st ()
+removeRBubbleTask id = runQuery' $ rawExecute "WITH RECURSIVE rtasks(x) AS (SELECT ? UNION ALL SELECT bubble_task.id FROM rtasks, bubble_task WHERE bubble_task.parent = rtasks.x ORDER BY 1 DESC) DELETE FROM bubble_task WHERE id IN rtasks" [PersistInt64 $ fromSqlKey id]
 
 runQuery' :: SqlPersistM val -> SpockActionCtx ctx SqlBackend sess st val
 runQuery' q = runQuery $ \conn -> runSqlPersistM q conn
