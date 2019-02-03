@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Web where
@@ -19,8 +20,14 @@ import Field
 data MySession = EmptySession
 data MyAppState = EmptyAppState
 
+corsHeader =
+  do ctx <- getContext
+     setHeader "Access-Control-Allow-Origin" "*"
+     pure ctx
+
 app :: SpockM SqlBackend MySession MyAppState ()
-app = do
+app = 
+  prehook corsHeader $ do
     put root $ do
         (task :: BubbleTask) <- jsonBody'
         sId <-  runQuery' $ insert task
